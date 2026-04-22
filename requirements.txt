@@ -3,8 +3,10 @@ langchain-core
 langchain-openai
 langgraph
 loguru
-numpy
+numpy<2.0
 pandas
 python-dotenv
 pytz
 tavily-python
+sentence-transformers==3.0.1
+transformers<5

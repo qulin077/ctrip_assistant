@@ -7,7 +7,14 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_openai import ChatOpenAI
 
 from graph_chat.state import State
-from project_config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_TEMPERATURE, TAVILY_API_KEY
+from project_config import (
+    MINIMAX_REASONING_SPLIT,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    OPENAI_MODEL,
+    OPENAI_TEMPERATURE,
+    TAVILY_API_KEY,
+)
 from tools.car_tools import search_car_rentals, book_car_rental, update_car_rental, cancel_car_rental
 from tools.flights_tools import fetch_user_flight_information, search_flights, update_ticket_to_new_flight, \
     cancel_ticket
@@ -87,11 +94,17 @@ def create_assistant_node() -> CtripAssistant:
     创建一个助手节点
     :return: 返回一个助手节点对象
     """
-    llm = ChatOpenAI(  # openai的
+    llm_kwargs = {}
+    if "minimax" in OPENAI_BASE_URL and MINIMAX_REASONING_SPLIT:
+        llm_kwargs["extra_body"] = {"reasoning_split": True}
+
+    llm = ChatOpenAI(
         temperature=OPENAI_TEMPERATURE,
         model=OPENAI_MODEL,
         api_key=OPENAI_API_KEY,
-        base_url=OPENAI_BASE_URL)
+        base_url=OPENAI_BASE_URL,
+        **llm_kwargs,
+    )
 
     # 创建主要助理使用的提示模板
     primary_assistant_prompt = ChatPromptTemplate.from_messages(
@@ -101,6 +114,9 @@ def create_assistant_node() -> CtripAssistant:
                 "您是携程瑞士航空公司的客户服务助理。优先使用提供的工具搜索航班、公司政策和其他信息来帮助用户的查询。"
                 "搜索时，请坚持不懈。如果第一次搜索没有结果，扩大您的查询范围。"
                 "如果搜索为空，在放弃之前扩展您的搜索。\n\n当前用户:\n<User>\n{user_info}\n</User>"
+                "\n在执行任何会改变订单或预订状态的操作前，必须先调用 lookup_policy 查询相关政策。"
+                "这些操作包括但不限于：机票改签、机票取消、酒店预订/修改/取消、租车预订/修改/取消、景点预订/修改/取消。"
+                "如果政策命中显示 requires_human_review 为是，或者政策内容提示需要人工处理，请不要直接承诺结果，应说明需要人工确认。"
                 "\n当前时间: {time}.",
             ),
             ("placeholder", "{messages}"),

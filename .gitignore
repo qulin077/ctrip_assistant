@@ -4,6 +4,8 @@ __pycache__/
 *.py[cod]
 .idea/
 logs/
+analysis/exports/
+analysis/*.docx
 
 # The demo SQLite datasets are larger than GitHub's normal 100 MB file limit.
 # Keep them locally, or track them with Git LFS in a repository that has LFS enabled.

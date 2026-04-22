@@ -1,0 +1,18 @@
+{"query":"我可以在起飞前多久在线改签？","expected_policy_id":"ticket_change_policy","expected_service":"flight","expected_policy_type":"change","note":"改签时限"}
+{"query":"哪些机票不能在线改签？","expected_policy_id":"ticket_change_policy","expected_service":"flight","expected_policy_type":"change","note":"不可在线改签条件"}
+{"query":"改签之后座位和特殊餐食还会保留吗？","expected_policy_id":"ticket_change_policy","expected_service":"flight","expected_policy_type":"change","note":"改签后关联服务"}
+{"query":"如果我取消机票，退款用什么货币？","expected_policy_id":"refund_policy","expected_service":"flight","expected_policy_type":"refund","note":"退款货币"}
+{"query":"24小时内取消机票可以全额退款吗？","expected_policy_id":"refund_policy","expected_service":"flight","expected_policy_type":"refund","note":"24小时取消"}
+{"query":"按发票支付的订单怎么退款？","expected_policy_id":"refund_policy","expected_service":"flight","expected_policy_type":"refund","note":"发票支付退款"}
+{"query":"电子机票可以当发票吗？","expected_policy_id":"invoice_policy","expected_service":"flight","expected_policy_type":"invoice","note":"电子机票发票"}
+{"query":"补开发票到底是90天还是100天？","expected_policy_id":"invoice_policy","expected_service":"flight","expected_policy_type":"invoice","note":"发票时限冲突"}
+{"query":"信用卡安全码是什么？","expected_policy_id":"payment_policy","expected_service":"flight","expected_policy_type":"payment","note":"信用卡安全码"}
+{"query":"什么是3-D Secure支付？","expected_policy_id":"payment_policy","expected_service":"flight","expected_policy_type":"payment","note":"3-D Secure"}
+{"query":"欧洲票价类型有什么区别？","expected_policy_id":"fare_rules","expected_service":"flight","expected_policy_type":"fare","note":"欧洲票价"}
+{"query":"App里面能看到所有预订吗？","expected_policy_id":"booking_platform_policy","expected_service":"booking","expected_policy_type":"platform","note":"App展示规则"}
+{"query":"酒店入住后还能取消吗？","expected_policy_id":"hotel_policy","expected_service":"hotel","expected_policy_type":"hotel","note":"入住后取消"}
+{"query":"酒店可以修改入住日期和退房日期吗？","expected_policy_id":"hotel_policy","expected_service":"hotel","expected_policy_type":"hotel","note":"酒店日期修改"}
+{"query":"租车开始前取消怎么收费？","expected_policy_id":"car_rental_policy","expected_service":"car_rental","expected_policy_type":"car_rental","note":"起租前取消"}
+{"query":"租车开始后还能修改吗？","expected_policy_id":"car_rental_policy","expected_service":"car_rental","expected_policy_type":"car_rental","note":"起租后修改"}
+{"query":"参加景点活动后还能退款吗？","expected_policy_id":"excursion_policy","expected_service":"excursion","expected_policy_type":"excursion","note":"活动开始后退款"}
+{"query":"景点行程能改期吗？","expected_policy_id":"excursion_policy","expected_service":"excursion","expected_policy_type":"excursion","note":"景点改期"}

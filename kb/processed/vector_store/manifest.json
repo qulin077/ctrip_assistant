@@ -1,0 +1,7 @@
+{
+  "embedding_provider": "local_hash",
+  "embedding_model": "BAAI/bge-m3",
+  "chunk_count": 86,
+  "dimension": 1024,
+  "chunks_path": "/Users/qulin/Desktop/AI/ai project/ctrip_assistant/kb/processed/chunks.jsonl"
+}

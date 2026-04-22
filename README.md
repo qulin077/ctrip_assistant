@@ -10,7 +10,7 @@
 - 查询、预订、修改、取消酒店
 - 查询、预订、修改、取消租车
 - 查询、预订、修改、取消旅行推荐
-- 检索 `order_faq.md` 中的订单、支付、发票、退改签政策
+- 检索 `kb/raw/policy/` 中的结构化政策知识库
 - 可选 Tavily 网络搜索兜底
 
 ## 数据集
@@ -22,7 +22,7 @@
 
 这两个文件各约 109MB，超过 GitHub 普通文件 100MB 限制，因此默认不纳入 Git。运行项目前需要把它们放在项目根目录。
 
-另一个知识库文件是 `order_faq.md`，用于政策类 RAG 检索。
+原始知识库文件是 `order_faq.md`。当前项目已将其拆分为 `kb/raw/policy/` 下的结构化政策文档，并通过 `kb/processed/chunks.jsonl` 和 `kb/processed/vector_store/` 做本地 RAG 检索。
 
 ## 配置
 
@@ -35,19 +35,39 @@ cp .env.example .env
 然后填写：
 
 ```text
-OPENAI_API_KEY=your_openai_compatible_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o
+MINIMAX_API_KEY=your_minimax_api_key
+MINIMAX_BASE_URL=https://api.minimaxi.com/v1
+MINIMAX_MODEL=MiniMax-M2.7
+MINIMAX_REASONING_SPLIT=true
+
+EMBEDDING_PROVIDER=local_hash
+EMBEDDING_MODEL=BAAI/bge-m3
 TAVILY_API_KEY=
 ```
 
 `TAVILY_API_KEY` 是可选项；不填时不会启用网络搜索工具。
+`MINIMAX_REASONING_SPLIT=true` 用于让 MiniMax-M2.7 的思考内容与最终回答分离，避免命令行客服回复里出现 `<think>` 内容。
+
+默认 embedding 使用 `local_hash`，不需要联网，适合本地快速验证。正式检索建议切换为：
+
+```text
+EMBEDDING_PROVIDER=sentence_transformers
+EMBEDDING_MODEL=BAAI/bge-m3
+```
+
+切换后重新构建向量索引：
+
+```bash
+python tools/build_vector_index.py
+```
 
 ## 安装
 
 ```bash
 pip install -r requirements.txt
 ```
+
+如果暂时不安装 `sentence-transformers`，保留 `EMBEDDING_PROVIDER=local_hash` 也可以运行基础检索测试。
 
 ## 运行
 
@@ -65,6 +85,32 @@ python -m graph_chat.第一个流程图
 q
 exit
 quit
+```
+
+## 知识库构建与评测
+
+重新生成 chunk：
+
+```bash
+python tools/build_kb_chunks.py
+```
+
+重新构建向量索引：
+
+```bash
+python tools/build_vector_index.py
+```
+
+运行检索冒烟测试：
+
+```bash
+python tools/test_policy_retriever.py
+```
+
+运行检索评测集：
+
+```bash
+python tools/evaluate_policy_retriever.py
 ```
 
 ## 导入 SQLite 到 MySQL
