@@ -67,6 +67,21 @@ exit
 quit
 ```
 
+## 导入 SQLite 到 MySQL
+
+项目提供了一个导入脚本，会把两个本地 SQLite 数据库分别导入为两个 MySQL database：
+
+```text
+travel_new.sqlite -> ctrip_travel_new
+travel2.sqlite    -> ctrip_travel_backup
+```
+
+运行：
+
+```bash
+python scripts/import_sqlite_to_mysql.py --password your_mysql_password
+```
+
 ## 项目说明
 
 完整代码讲解见：
