@@ -1,0 +1,10 @@
+langchain-community
+langchain-core
+langchain-openai
+langgraph
+loguru
+numpy
+pandas
+python-dotenv
+pytz
+tavily-python

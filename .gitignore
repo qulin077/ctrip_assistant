@@ -1,0 +1,11 @@
+.env
+.DS_Store
+__pycache__/
+*.py[cod]
+.idea/
+logs/
+
+# The demo SQLite datasets are larger than GitHub's normal 100 MB file limit.
+# Keep them locally, or track them with Git LFS in a repository that has LFS enabled.
+travel_new.sqlite
+travel2.sqlite
