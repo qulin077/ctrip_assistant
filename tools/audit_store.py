@@ -57,6 +57,33 @@ def init_audit_tables() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS operator_notes (
+                note_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                session_id TEXT,
+                passenger_id TEXT,
+                author TEXT NOT NULL DEFAULT 'operator',
+                note TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_summaries (
+                summary_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                passenger_id TEXT,
+                summary TEXT NOT NULL,
+                main_intent TEXT,
+                resolution_status TEXT,
+                tools_used TEXT,
+                policies_used TEXT
+            )
+            """
+        )
         conn.commit()
 
 
@@ -152,6 +179,79 @@ def create_service_ticket(
                 policy_id,
                 reason,
                 json.dumps(metadata or {}, ensure_ascii=False, default=str),
+            ),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def update_service_ticket_status(ticket_id: int, status: str) -> None:
+    init_audit_tables()
+    with connect() as conn:
+        cursor = conn.execute(
+            "UPDATE service_tickets SET status = ? WHERE ticket_id = ?",
+            (status, ticket_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError(f"service ticket {ticket_id} not found")
+        conn.commit()
+
+
+def add_operator_note(
+    *,
+    note: str,
+    author: str = "operator",
+    session_id: Optional[str] = None,
+    passenger_id: Optional[str] = None,
+) -> int:
+    init_audit_tables()
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO operator_notes (created_at, session_id, passenger_id, author, note)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now().isoformat(timespec="seconds"),
+                session_id,
+                passenger_id,
+                author,
+                note,
+            ),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def upsert_conversation_summary(
+    *,
+    session_id: str,
+    summary: str,
+    passenger_id: Optional[str] = None,
+    main_intent: Optional[str] = None,
+    resolution_status: Optional[str] = None,
+    tools_used: Optional[list[str]] = None,
+    policies_used: Optional[list[str]] = None,
+) -> int:
+    init_audit_tables()
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO conversation_summaries (
+                created_at, session_id, passenger_id, summary, main_intent,
+                resolution_status, tools_used, policies_used
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now().isoformat(timespec="seconds"),
+                session_id,
+                passenger_id,
+                summary,
+                main_intent,
+                resolution_status,
+                json.dumps(tools_used or [], ensure_ascii=False),
+                json.dumps(policies_used or [], ensure_ascii=False),
             ),
         )
         conn.commit()

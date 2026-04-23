@@ -231,19 +231,27 @@ streamlit run frontend/streamlit_app.py
 
 前端包含：
 
+- Customer Copilot：通过 `/api/agent/chat` 调用 LangGraph assistant，展示 assistant 输出、policy card 和最近 audit。
+- Customer Context：展示 passenger profile、action timeline、operator notes 和 conversation summary。
 - Policy Search：按 query / service / policy_type 检索政策。
 - Guarded Action：演示受保护写操作，未确认时只返回确认提示。
-- Audit：查看最近 action audit logs 和 service tickets。
+- Audit：查看最近 action audit logs、service tickets，并支持更新工单状态。
 - Analytics：展示客服业务分析报告。
 
 后端主要接口：
 
 ```text
 GET  /health
+POST /api/agent/chat
 POST /api/policy/search
 POST /api/actions/execute
 GET  /api/audit/recent
 GET  /api/service-tickets
+PATCH /api/service-tickets/{ticket_id}
+GET  /api/passengers/{passenger_id}/profile
+GET  /api/timeline
+POST /api/operator-notes
+POST /api/conversation-summaries
 GET  /api/analytics/summary
 POST /api/analytics/report
 ```
@@ -274,17 +282,41 @@ python tools/test_guarded_actions.py
 python tools/test_api.py
 ```
 
+生成新版评测集：
+
+```bash
+python tools/generate_eval_sets.py
+```
+
+三层企业级评测：
+
+```bash
+python tools/evaluate_retriever_v2.py
+python tools/evaluate_guardrails.py
+python tools/evaluate_e2e.py
+```
+
 生成业务分析报告：
 
 ```bash
 python tools/customer_analytics.py
 ```
 
-当前检索评测结果：
+当前新版评测结果：
 
 ```text
-Top-1 accuracy: 1.0
-Top-3 accuracy: 1.0
+Retrieval V2: top1=0.7895, top3=0.9123, MRR=0.8421
+Guardrail: scenario_pass_rate=0.9, unsafe_execution_rate=0.0
+E2E: scenario_pass_rate=0.5667
+```
+
+评测报告见：
+
+```text
+analysis/retriever_eval_v2.md
+analysis/guardrail_eval.md
+analysis/e2e_eval.md
+analysis/eval_summary.md
 ```
 
 ## 数据科学分析

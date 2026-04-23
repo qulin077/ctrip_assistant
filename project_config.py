@@ -18,6 +18,9 @@ KB_POLICY_INDEX_PATH = PROJECT_ROOT / "kb" / "metadata" / "policy_index.jsonl"
 KB_CHUNKS_PATH = PROJECT_ROOT / "kb" / "processed" / "chunks.jsonl"
 KB_VECTOR_STORE_DIR = PROJECT_ROOT / "kb" / "processed" / "vector_store"
 KB_RETRIEVER_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_set.jsonl"
+KB_RETRIEVER_EVAL_SET_V2_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_set_v2.jsonl"
+KB_GUARDRAIL_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "guardrail_eval_set.jsonl"
+KB_E2E_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "e2e_eval_set.jsonl"
 
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1")

@@ -1,16 +1,16 @@
-import sys
-from pathlib import Path
 from typing import Any, Optional
 
 import requests
 import streamlit as st
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from tools.customer_analytics import generate_report
-
 
 API_BASE_URL = st.sidebar.text_input("API Base URL", value="http://127.0.0.1:8000").rstrip("/")
+
+
+def ensure_copilot_state() -> None:
+    st.session_state.setdefault("copilot_messages", [])
+    st.session_state.setdefault("copilot_thread_id", "streamlit-copilot")
+    st.session_state.setdefault("copilot_passenger_id", "3442 587242")
 
 
 def api_get(path: str, **params) -> dict[str, Any]:
@@ -92,6 +92,104 @@ def render_policy_search() -> None:
             st.info(match.get("chunk_text", ""))
 
 
+def render_policy_card(policy: dict[str, Any]) -> None:
+    if not policy:
+        return
+    with st.container(border=True):
+        st.markdown(f"**Policy:** `{policy.get('policy_id')}`")
+        cols = st.columns(3)
+        cols[0].metric("Human Review", "Yes" if policy.get("requires_human_review") else "No")
+        cols[1].metric("Confirmation", "Yes" if policy.get("requires_confirmation") else "No")
+        cols[2].metric("Risk", policy.get("risk_level") or "normal")
+        st.caption(f"Section: {policy.get('section_title')}")
+        allowed = policy.get("allowed_action") or []
+        if allowed:
+            st.caption("Allowed action: " + ", ".join(allowed))
+
+
+def render_action_card(result: dict[str, Any]) -> None:
+    with st.container(border=True):
+        st.markdown(f"**Action:** `{result.get('tool_name')}`")
+        cols = st.columns(4)
+        cols[0].metric("Status", result.get("status") or "-")
+        cols[1].metric("Executed", "Yes" if result.get("executed") else "No")
+        cols[2].metric("Ticket", "Created" if result.get("service_ticket_created") else "No")
+        cols[3].metric("Policy", result.get("policy_id") or "-")
+        if result.get("confirmation_prompt"):
+            st.warning(result["confirmation_prompt"])
+        st.text(result.get("display_text") or result.get("result_text") or "")
+
+
+def render_audit_event_card(event: dict[str, Any]) -> None:
+    with st.container(border=True):
+        st.markdown(f"**Audit Event:** `{event.get('tool_name')}`")
+        cols = st.columns(4)
+        cols[0].metric("Executed", "Yes" if event.get("executed") else "No")
+        cols[1].metric("Confirm", "Yes" if event.get("requires_confirmation") else "No")
+        cols[2].metric("Risk", event.get("risk_level") or "normal")
+        cols[3].metric("Policy", event.get("policy_id") or "-")
+        st.caption(event.get("intent") or "")
+        if event.get("blocked_reason"):
+            st.warning(f"Blocked reason: {event['blocked_reason']}")
+
+
+def render_copilot() -> None:
+    ensure_copilot_state()
+    st.subheader("Customer Copilot")
+    st.caption("LangGraph-powered copilot for policy questions and guarded write actions.")
+    col1, col2 = st.columns(2)
+    st.session_state.copilot_passenger_id = col1.text_input(
+        "Passenger ID",
+        value=st.session_state.copilot_passenger_id,
+        key="copilot_passenger_input",
+    )
+    st.session_state.copilot_thread_id = col2.text_input(
+        "Session ID",
+        value=st.session_state.copilot_thread_id,
+        key="copilot_thread_input",
+    )
+
+    for item in st.session_state.copilot_messages:
+        with st.chat_message(item["role"]):
+            st.markdown(item["content"])
+            for policy in item.get("policies", []):
+                render_policy_card(policy)
+            if item.get("action_result"):
+                render_action_card(item["action_result"])
+            if item.get("latest_audit"):
+                render_audit_event_card(item["latest_audit"])
+            if item.get("audit"):
+                st.dataframe(item["audit"], use_container_width=True)
+
+    prompt = st.chat_input("Ask the LangGraph assistant")
+    if not prompt:
+        return
+
+    st.session_state.copilot_messages.append({"role": "user", "content": prompt})
+    assistant_item: dict[str, Any] = {"role": "assistant", "content": ""}
+
+    try:
+        result = api_post(
+            "/api/agent/chat",
+            {
+                "message": prompt,
+                "passenger_id": st.session_state.copilot_passenger_id,
+                "thread_id": st.session_state.copilot_thread_id,
+            },
+        )
+        assistant_item["content"] = result.get("assistant_output") or "已处理。"
+        assistant_item["policies"] = result.get("policy_cards", [])
+        audit_rows = result.get("recent_audit", [])
+        assistant_item["audit"] = audit_rows
+        if audit_rows:
+            assistant_item["latest_audit"] = audit_rows[0]
+    except Exception as exc:
+        assistant_item["content"] = f"处理失败：{exc}"
+
+    st.session_state.copilot_messages.append(assistant_item)
+    st.rerun()
+
+
 def render_guarded_action() -> None:
     st.subheader("Guarded Action Demo")
     action = st.selectbox(
@@ -139,7 +237,16 @@ def render_guarded_action() -> None:
             st.success("Write action executed")
         else:
             st.warning("Write action not executed")
-        st.text(result.get("result", ""))
+        st.write(
+            {
+                "status": result.get("status"),
+                "policy_id": result.get("policy_id"),
+                "requires_confirmation": result.get("requires_confirmation"),
+                "requires_human_review": result.get("requires_human_review"),
+                "service_ticket_created": result.get("service_ticket_created"),
+            }
+        )
+        st.text(result.get("display_text") or result.get("result_text", ""))
 
 
 def render_audit() -> None:
@@ -160,31 +267,105 @@ def render_audit() -> None:
         except Exception as exc:
             st.error(str(exc))
 
+    st.markdown("**Update Service Ticket**")
+    c1, c2, c3 = st.columns([1, 1, 2])
+    ticket_id = c1.number_input("Ticket ID", min_value=1, value=1)
+    new_status = c2.selectbox("Status", ["open", "in_progress", "resolved", "closed"])
+    if c3.button("Update Ticket Status"):
+        try:
+            result = requests.patch(
+                f"{API_BASE_URL}/api/service-tickets/{ticket_id}",
+                json={"status": new_status},
+                timeout=20,
+            )
+            result.raise_for_status()
+            st.success(f"Ticket {ticket_id} updated to {new_status}")
+        except Exception as exc:
+            st.error(str(exc))
+
+
+def render_customer_context() -> None:
+    st.subheader("Passenger Profile, Timeline & Notes")
+    col1, col2 = st.columns(2)
+    passenger_id = col1.text_input("Passenger ID", value="3442 587242", key="profile_passenger")
+    session_id = col2.text_input("Session ID", value="streamlit-copilot", key="profile_session")
+
+    profile = api_get(f"/api/passengers/{passenger_id}/profile")
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Tickets", len(profile.get("tickets", [])))
+    k2.metric("Audit Logs", profile.get("audit_count", 0))
+    k3.metric("Service Tickets", profile.get("service_ticket_count", 0))
+
+    with st.expander("Tickets and Flights", expanded=True):
+        st.dataframe(profile.get("tickets", []), use_container_width=True)
+        st.dataframe(profile.get("flights", []), use_container_width=True)
+
+    st.markdown("**Operator Notes**")
+    note = st.text_area("Add note")
+    if st.button("Save Operator Note"):
+        api_post(
+            "/api/operator-notes",
+            {
+                "note": note,
+                "author": "operator",
+                "session_id": session_id,
+                "passenger_id": passenger_id,
+            },
+        )
+        st.success("Note saved")
+    notes = api_get("/api/operator-notes", session_id=session_id, passenger_id=passenger_id, limit=20).get("items", [])
+    st.dataframe(notes, use_container_width=True)
+
+    st.markdown("**Conversation Summary**")
+    if st.button("Generate Conversation Summary"):
+        summary = api_post(
+            "/api/conversation-summaries",
+            {"session_id": session_id, "passenger_id": passenger_id},
+        )
+        st.success(summary.get("summary"))
+    summaries = api_get("/api/conversation-summaries", session_id=session_id, passenger_id=passenger_id).get("items", [])
+    st.dataframe(summaries, use_container_width=True)
+
+    st.markdown("**Action Timeline**")
+    timeline = api_get("/api/timeline", session_id=session_id, passenger_id=passenger_id, limit=50).get("items", [])
+    st.dataframe(timeline, use_container_width=True)
+
 
 def render_report() -> None:
     st.subheader("Customer Service Analytics")
     if st.button("Generate Analytics Report"):
         api_post("/api/analytics/report")
-    report_path = Path(__file__).resolve().parents[1] / "analysis" / "customer_service_analytics.md"
-    if report_path.exists():
-        st.markdown(report_path.read_text(encoding="utf-8"))
-    else:
-        generate_report(report_path)
-        st.markdown(report_path.read_text(encoding="utf-8"))
+    try:
+        summary = api_get("/api/analytics/summary")
+        guardrails = summary.get("guardrails", {})
+        cols = st.columns(5)
+        cols[0].metric("Audit", guardrails.get("audit_total", 0))
+        cols[1].metric("Executed", guardrails.get("executed", 0))
+        cols[2].metric("Pending", guardrails.get("blocked_or_pending", 0))
+        cols[3].metric("Human Review", guardrails.get("requires_human_review", 0))
+        cols[4].metric("High Risk", guardrails.get("high_risk", 0))
+        report = api_get("/api/analytics/report")
+        st.markdown(report.get("content", ""))
+    except Exception as exc:
+        st.error(f"Failed to load analytics report from API: {exc}")
 
 
 def main() -> None:
     st.set_page_config(page_title="Ctrip Assistant", layout="wide")
     render_status()
     render_kpis()
-    tabs = st.tabs(["Policy Search", "Guarded Action", "Audit", "Analytics"])
+    tabs = st.tabs(["Customer Copilot", "Customer Context", "Policy Search", "Guarded Action", "Audit", "Analytics"])
     with tabs[0]:
-        render_policy_search()
+        render_copilot()
     with tabs[1]:
-        render_guarded_action()
+        render_customer_context()
     with tabs[2]:
-        render_audit()
+        render_policy_search()
     with tabs[3]:
+        render_guarded_action()
+    with tabs[4]:
+        render_audit()
+    with tabs[5]:
         render_report()
 
 
