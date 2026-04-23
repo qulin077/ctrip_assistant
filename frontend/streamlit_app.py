@@ -13,14 +13,14 @@ def ensure_copilot_state() -> None:
     st.session_state.setdefault("copilot_passenger_id", "3442 587242")
 
 
-def api_get(path: str, **params) -> dict[str, Any]:
-    response = requests.get(f"{API_BASE_URL}{path}", params=params, timeout=20)
+def api_get(path: str, timeout: int = 20, **params) -> dict[str, Any]:
+    response = requests.get(f"{API_BASE_URL}{path}", params=params, timeout=timeout)
     response.raise_for_status()
     return response.json()
 
 
-def api_post(path: str, payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-    response = requests.post(f"{API_BASE_URL}{path}", json=payload or {}, timeout=30)
+def api_post(path: str, payload: Optional[dict[str, Any]] = None, timeout: int = 60) -> dict[str, Any]:
+    response = requests.post(f"{API_BASE_URL}{path}", json=payload or {}, timeout=timeout)
     response.raise_for_status()
     return response.json()
 
@@ -52,6 +52,25 @@ def render_kpis() -> None:
         0 if guardrails.get("audit_total", 0) == 0 else guardrails.get("executed", 0) / guardrails["audit_total"],
         text="受保护写操作执行率",
     )
+
+
+def render_business_guide() -> None:
+    with st.expander("这个项目在模拟什么业务？每个页面怎么用？", expanded=False):
+        st.markdown(
+            """
+            **业务背景：** 这是一个旅行客服 Agent 原型，模拟客服坐席处理航班、酒店、租车、景点相关问题。
+            它不是普通聊天机器人，而是把业务数据库、政策知识库、写操作保护、审计日志和工单串起来。
+
+            - **客服 Copilot**：最像真实客服对话。适合问“我可以改签吗”“帮我取消机票”这类自然语言问题。它会调用 LangGraph 和大模型，所以可能比普通检索慢。
+            - **客户上下文**：客服坐席看旅客资料、机票航班、历史备注、会话摘要和操作时间线。
+            - **政策检索**：只查政策知识库，不走大模型。适合快速验证 RAG，比如“我可以在起飞前多久在线改签？”。
+            - **受保护操作**：手动测试取消、改签、预订等写操作是否会先查政策、要求确认、写审计日志。
+            - **审计**：查看系统做过什么、是否执行、为什么阻断、是否创建人工工单。
+            - **数据分析**：面向数据科学面试，展示自动化率、阻断率、人工复核、高风险操作等指标。
+
+            **小提示：** 简单政策问题先用“政策检索”页，速度最快；要演示完整客服 Agent 流程时再用“客服 Copilot”。
+            """
+        )
 
 
 def render_policy_search() -> None:
@@ -137,6 +156,7 @@ def render_copilot() -> None:
     ensure_copilot_state()
     st.subheader("客服 Copilot")
     st.caption("由 LangGraph 驱动的客服助手，可回答政策问题并处理受保护写操作。")
+    st.info("这个页面会调用大模型，首次请求或复杂工具调用可能需要 30 秒以上；只想快速查政策时，请用“政策检索”页。")
     col1, col2 = st.columns(2)
     st.session_state.copilot_passenger_id = col1.text_input(
         "旅客 ID",
@@ -169,14 +189,16 @@ def render_copilot() -> None:
     assistant_item: dict[str, Any] = {"role": "assistant", "content": ""}
 
     try:
-        result = api_post(
-            "/api/agent/chat",
-            {
-                "message": prompt,
-                "passenger_id": st.session_state.copilot_passenger_id,
-                "thread_id": st.session_state.copilot_thread_id,
-            },
-        )
+        with st.spinner("正在调用 LangGraph 客服助手，请稍等..."):
+            result = api_post(
+                "/api/agent/chat",
+                {
+                    "message": prompt,
+                    "passenger_id": st.session_state.copilot_passenger_id,
+                    "thread_id": st.session_state.copilot_thread_id,
+                },
+                timeout=120,
+            )
         assistant_item["content"] = result.get("assistant_output") or "已处理。"
         assistant_item["policies"] = result.get("policy_cards", [])
         audit_rows = result.get("recent_audit", [])
@@ -354,6 +376,7 @@ def main() -> None:
     st.set_page_config(page_title="携程旅行客服智能体", layout="wide")
     render_status()
     render_kpis()
+    render_business_guide()
     tabs = st.tabs(["客服 Copilot", "客户上下文", "政策检索", "受保护操作", "审计", "数据分析"])
     with tabs[0]:
         render_copilot()
