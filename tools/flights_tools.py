@@ -228,7 +228,7 @@ def cancel_ticket(ticket_no: str, *, config: RunnableConfig) -> str:
 
     # 确认已登录用户确实拥有此机票
     cursor.execute(
-        "SELECT flight_id FROM tickets WHERE ticket_no = ? AND passenger_id = ?",
+        "SELECT ticket_no FROM tickets WHERE ticket_no = ? AND passenger_id = ?",
         (ticket_no, passenger_id),
     )
     current_ticket = cursor.fetchone()

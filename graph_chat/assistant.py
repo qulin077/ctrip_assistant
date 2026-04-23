@@ -15,12 +15,24 @@ from project_config import (
     OPENAI_TEMPERATURE,
     TAVILY_API_KEY,
 )
-from tools.car_tools import search_car_rentals, book_car_rental, update_car_rental, cancel_car_rental
-from tools.flights_tools import fetch_user_flight_information, search_flights, update_ticket_to_new_flight, \
-    cancel_ticket
-from tools.hotels_tools import search_hotels, book_hotel, update_hotel, cancel_hotel
+from tools.action_guard import (
+    book_car_rental,
+    book_excursion,
+    book_hotel,
+    cancel_car_rental,
+    cancel_excursion,
+    cancel_hotel,
+    cancel_ticket,
+    update_car_rental,
+    update_excursion,
+    update_hotel,
+    update_ticket_to_new_flight,
+)
+from tools.car_tools import search_car_rentals
+from tools.flights_tools import fetch_user_flight_information, search_flights
+from tools.hotels_tools import search_hotels
 from tools.retriever_vector import lookup_policy
-from tools.trip_tools import search_trip_recommendations, book_excursion, update_excursion, cancel_excursion
+from tools.trip_tools import search_trip_recommendations
 
 
 class CtripAssistant:
@@ -116,6 +128,8 @@ def create_assistant_node() -> CtripAssistant:
                 "如果搜索为空，在放弃之前扩展您的搜索。\n\n当前用户:\n<User>\n{user_info}\n</User>"
                 "\n在执行任何会改变订单或预订状态的操作前，必须先调用 lookup_policy 查询相关政策。"
                 "这些操作包括但不限于：机票改签、机票取消、酒店预订/修改/取消、租车预订/修改/取消、景点预订/修改/取消。"
+                "所有写操作工具都带有 user_confirmation 参数；如果用户尚未明确确认，请不要填该参数，让工具返回确认提示。"
+                "只有用户明确回复“确认、是、好的、同意、继续”等肯定表达后，才可以再次调用写操作工具并传入 user_confirmation。"
                 "如果政策命中显示 requires_human_review 为是，或者政策内容提示需要人工处理，请不要直接承诺结果，应说明需要人工确认。"
                 "\n当前时间: {time}.",
             ),

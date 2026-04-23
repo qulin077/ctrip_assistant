@@ -86,6 +86,9 @@ def format_policy_matches(result: dict[str, Any]) -> str:
                     f"- policy_type: {match.get('policy_type')}",
                     f"- section_title: {match.get('section_title')}",
                     f"- requires_human_review: {review_note}",
+                    f"- requires_confirmation: {'是' if match.get('requires_confirmation') else '否'}",
+                    f"- risk_level: {match.get('risk_level') or 'normal'}",
+                    f"- allowed_action: {', '.join(match.get('allowed_action') or []) or '无'}",
                     f"- similarity: {match.get('similarity')}",
                     "",
                     str(match.get("chunk_text", "")).strip(),
@@ -96,9 +99,18 @@ def format_policy_matches(result: dict[str, Any]) -> str:
 
 
 @tool
-def lookup_policy(query: str) -> str:
-    """查询旅行客服政策知识库。执行改签、取消、退款、开票等操作前应先查询政策。"""
-    result = lookup_policy_structured(query=query, top_k=3)
+def lookup_policy(
+    query: str,
+    service: Optional[str] = None,
+    policy_type: Optional[str] = None,
+) -> str:
+    """查询旅行客服政策知识库。可传 service 和 policy_type 过滤政策范围。"""
+    result = lookup_policy_structured(
+        query=query,
+        top_k=3,
+        service=service,
+        policy_type=policy_type,
+    )
     return format_policy_matches(result)
 
 
