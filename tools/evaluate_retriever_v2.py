@@ -133,6 +133,17 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
         if row["top_policy_id"] != row["expected_policy_id"] and row["top_policy_id"] in row["policy_ids"]
     ]
     embedding = metrics["embedding"]
+    provider = str(embedding.get("embedding_provider") or "")
+    if provider.startswith("sentence_transformers"):
+        embedding_note = (
+            "`BAAI/bge-m3` 提升了语义召回，但多意图 query 仍需要 query router "
+            "或意图拆分来减少相邻 policy 干扰。"
+        )
+    else:
+        embedding_note = (
+            "`local_hash` embedding 更依赖词面重叠，遇到口语化、英文缩写或隐含业务语义时 "
+            "不如语义向量模型稳定。"
+        )
     lines = [
         "# Retriever Evaluation V2",
         "",
@@ -171,7 +182,7 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
         "",
         "- 多意图和高风险 query 最容易错，因为一个问题里同时出现退票、改签、酒店、租车等多个相邻业务意图。",
         "- 相邻 policy 的误命中主要发生在退款、票价规则、支付退款之间，以及酒店/租车/景点三个 `booking_policy` 类型之间。",
-        "- `local_hash` embedding 更依赖词面重叠，遇到口语化、英文缩写或隐含业务语义时不如语义向量模型稳定。",
+        f"- {embedding_note}",
         "",
         "## 7. Failed Or Weak Cases",
         "",

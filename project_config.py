@@ -9,7 +9,7 @@ except ImportError:
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(PROJECT_ROOT / ".env", override=True)
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 TRAVEL_DB_PATH = PROJECT_ROOT / "travel_new.sqlite"
 TRAVEL_DB_BACKUP_PATH = PROJECT_ROOT / "travel2.sqlite"
@@ -32,5 +32,5 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL") or MINIMAX_BASE_URL
 OPENAI_MODEL = os.getenv("OPENAI_MODEL") or MINIMAX_MODEL
 OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "1.0"))
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local_hash")
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "sentence_transformers")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")

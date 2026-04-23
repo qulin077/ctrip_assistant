@@ -1,5 +1,5 @@
 {
-  "embedding_provider": "local_hash",
+  "embedding_provider": "sentence_transformers:BAAI/bge-m3",
   "embedding_model": "BAAI/bge-m3",
   "chunk_count": 86,
   "dimension": 1024,

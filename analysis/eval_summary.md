@@ -31,38 +31,47 @@
 
 ## 4. 当前评测结果
 
+当前默认向量索引：
+
+```text
+embedding_provider=sentence_transformers
+embedding_model=BAAI/bge-m3
+```
+
 ### Retrieval
 
 | Metric | Value |
 | --- | ---: |
-| top1_accuracy | 0.7895 |
-| top3_accuracy | 0.9123 |
-| MRR | 0.8421 |
+| top1_accuracy | 0.7982 |
+| top3_accuracy | 0.9386 |
+| MRR | 0.8640 |
 | filtered_top1_accuracy | 1.0 |
 
-解读：当业务调用方能传入 `service` 和 `policy_type` 过滤条件时，检索非常稳定；纯自然语言无过滤时，多意图和相邻 policy 仍会拉低 top1。
+解读：当前默认 embedding 已切换为 `sentence_transformers + BAAI/bge-m3`。当业务调用方能传入 `service` 和 `policy_type` 过滤条件时，检索非常稳定；纯自然语言无过滤时，多意图和相邻 policy 仍会拉低 top1。
+
+与 `local_hash` 对比见 `analysis/embedding_comparison.md`。
 
 ### Guardrail
 
 | Metric | Value |
 | --- | ---: |
-| scenario_pass_rate | 0.9 |
+| scenario_pass_rate | 0.75 |
 | confirmation_gate_hit_rate | 1.0 |
 | unsafe_execution_rate | 0.0 |
 | service_ticket_trigger_rate | 1.0 |
 | audit_log_write_rate | 1.0 |
 
-解读：写操作保护层的核心价值已经体现：未确认不执行、无政策依据阻断、审计完整落库。当前失败主要来自 service ticket 触发策略比预期更保守，对部分租车/景点写操作创建了工单。
+解读：写操作保护层的核心价值已经体现：未确认不执行、无政策依据阻断、审计完整落库。切换 bge-m3 后，召回的 chunk 更容易包含高风险/人工复核信号，因此 service ticket 触发比原先更保守。
 
 ### End-to-End
 
 | Metric | Value |
 | --- | ---: |
-| scenario_pass_rate | 0.5667 |
+| scenario_pass_rate | 0.4333 |
 | answer_only_accuracy | 0.5 |
-| needs_confirmation_accuracy | 0.8889 |
+| needs_confirmation_accuracy | 0.6667 |
 | blocked_accuracy | 0.0 |
-| executed_accuracy | 0.875 |
+| executed_accuracy | 0.625 |
 | handoff_accuracy | 0.0 |
 
 解读：写操作主链路表现较好，但端到端仍是当前最弱层。原因不是 guarded action 本身，而是自然语言意图识别、纯咨询类人工升级、service ticket 自动创建策略还没有产品化。
@@ -99,12 +108,12 @@
 
 1. 自然语言意图识别还不够企业级，尤其是多意图、含糊表达和相邻业务域。
 2. 纯咨询类高风险问题还没有统一创建 service ticket，handoff 仍偏回答策略而非流程控制。
-3. 当前默认 `local_hash` embedding 更像离线基线，语义泛化不如 `sentence_transformers + BAAI/bge-m3`。
+3. 当前默认 `BAAI/bge-m3` 提升了召回，但也暴露了更保守的 risk chunk 命中和 service ticket 策略问题。
 
 ## 7. 下一步最值得优化的 3 个方向
 
 1. 将 E2E evaluator 接入真实 LangGraph tool call trace，评估模型是否选择了正确工具，而不是只评估规则 orchestrator。
-2. 切换到 `sentence_transformers + BAAI/bge-m3` 后重建向量索引，并与 `local_hash` 做对比报告。
+2. 在 `BAAI/bge-m3` 之上增加 query router 和多意图拆分，降低相邻 policy 干扰。
 3. 新增独立 escalation policy，把 `requires_human_review`、`risk_level`、service ticket 创建、人工升级话术拆成可配置规则。
 
 ## 8. 面试讲述方式

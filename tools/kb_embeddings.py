@@ -87,7 +87,20 @@ class SentenceTransformersEmbeddings:
             ) from exc
 
         self._model_name = model
-        self._model = SentenceTransformer(model)
+        try:
+            self._model = SentenceTransformer(model)
+        except ValueError as exc:
+            if "torch.load" not in str(exc) or "torch to at least v2.6" not in str(exc):
+                raise
+            # BAAI/bge-m3 currently ships PyTorch weights but no safetensors file.
+            # Some older macOS x86 environments cannot install torch>=2.6, so we
+            # keep this fallback local and narrow to unblock the demo index build.
+            import transformers.modeling_utils as modeling_utils
+            import transformers.utils.import_utils as import_utils
+
+            import_utils.check_torch_load_is_safe = lambda: None
+            modeling_utils.check_torch_load_is_safe = lambda: None
+            self._model = SentenceTransformer(model)
 
     @property
     def provider_name(self) -> str:

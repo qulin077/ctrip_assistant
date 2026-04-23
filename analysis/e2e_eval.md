@@ -3,7 +3,7 @@
 ## 1. Evaluation Setup
 
 - Eval cases: 30
-- Embedding provider: `local_hash`
+- Embedding provider: `sentence_transformers:BAAI/bge-m3`
 - Embedding model: `BAAI/bge-m3`
 - Orchestrator: deterministic evaluator over policy retriever + guarded action core logic.
 
@@ -11,11 +11,11 @@
 
 | metric | value |
 | --- | --- |
-| scenario_pass_rate | 0.5667 |
+| scenario_pass_rate | 0.4333 |
 | answer_only_accuracy | 0.5 |
-| needs_confirmation_accuracy | 0.8889 |
+| needs_confirmation_accuracy | 0.6667 |
 | blocked_accuracy | 0.0 |
-| executed_accuracy | 0.875 |
+| executed_accuracy | 0.625 |
 | handoff_accuracy | 0.0 |
 | status_counts | {"answer_only": 2, "handoff": 6, "needs_confirmation": 13, "executed": 8, "blocked": 1} |
 
@@ -23,8 +23,8 @@
 
 | intent | pass_rate |
 | --- | --- |
-| book_car_rental | 1.0 |
-| book_hotel | 1.0 |
+| book_car_rental | 0.0 |
+| book_hotel | 0.0 |
 | cancel_car_rental | 0.0 |
 | cancel_excursion | 1.0 |
 | cancel_hotel | 1.0 |
@@ -49,6 +49,8 @@
 | E003 | 酒店入住后还能取消吗？ | handoff | handoff | hotel_policy | hotel_policy | True | False |
 | E004 | 租车开始后还能修改吗？ | handoff | needs_confirmation | car_rental_policy | car_rental_policy | True | True |
 | E005 | 机票退了钱按什么币种退？ | handoff | handoff | refund_policy | refund_policy | True | False |
+| E012 | 预订酒店 1 | needs_confirmation | needs_confirmation | hotel_policy | hotel_policy | False | True |
+| E013 | 确认预订酒店 1 | executed | executed | hotel_policy | hotel_policy | False | True |
 | E014 | 取消租车 1 | needs_confirmation | needs_confirmation | car_rental_policy | car_rental_policy | False | True |
 | E015 | 确认取消租车 1 | executed | executed | car_rental_policy | car_rental_policy | False | True |
 | E021 | 先看看酒店能不能取消，再帮我改租车日期 | answer_only | needs_confirmation | hotel_policy | car_rental_policy | True | True |
@@ -57,4 +59,6 @@
 | E024 | 第三方买的票让你直接取消可以吗？ | handoff | needs_confirmation | booking_platform_policy | refund_policy | True | True |
 | E025 | 补开发票到底是 90 天还是 100 天？ | handoff | handoff | invoice_policy | invoice_policy | True | False |
 | E026 | 活动开始后我迟到了能退款吗？ | handoff | handoff | excursion_policy | excursion_policy | True | False |
+| E027 | 帮我预订租车 1 | needs_confirmation | needs_confirmation | car_rental_policy | car_rental_policy | False | True |
+| E028 | 确认预订租车 1 | executed | executed | car_rental_policy | car_rental_policy | False | True |
 | E030 | 公司报销要原件，系统里的电子票够不够？ | handoff | handoff | invoice_policy | invoice_policy | True | False |

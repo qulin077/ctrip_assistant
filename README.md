@@ -171,21 +171,21 @@ MINIMAX_BASE_URL=https://api.minimaxi.com/v1
 MINIMAX_MODEL=MiniMax-M2.7
 MINIMAX_REASONING_SPLIT=true
 
-EMBEDDING_PROVIDER=local_hash
+EMBEDDING_PROVIDER=sentence_transformers
 EMBEDDING_MODEL=BAAI/bge-m3
 TAVILY_API_KEY=
 ```
 
 `TAVILY_API_KEY` 是可选项；不填时不会启用网络搜索工具。
 
-默认 embedding 使用 `local_hash`，不需要联网，适合本地快速验证。正式检索建议切换为：
+默认 embedding 使用 `sentence_transformers + BAAI/bge-m3`，适合中文/多语言政策检索：
 
 ```text
 EMBEDDING_PROVIDER=sentence_transformers
 EMBEDDING_MODEL=BAAI/bge-m3
 ```
 
-切换后重新构建向量索引。
+如果本地模型或依赖暂时不可用，可以临时切换到 `EMBEDDING_PROVIDER=local_hash` 做离线 smoke test。切换 embedding 后需要重新构建向量索引。
 
 ## 安装
 
@@ -231,12 +231,43 @@ streamlit run frontend/streamlit_app.py
 
 前端包含：
 
-- Customer Copilot：通过 `/api/agent/chat` 调用 LangGraph assistant，展示 assistant 输出、policy card 和最近 audit。
-- Customer Context：展示 passenger profile、action timeline、operator notes 和 conversation summary。
-- Policy Search：按 query / service / policy_type 检索政策。
-- Guarded Action：演示受保护写操作，未确认时只返回确认提示。
-- Audit：查看最近 action audit logs、service tickets，并支持更新工单状态。
-- Analytics：展示客服业务分析报告。
+- 客服 Copilot：通过 `/api/agent/chat` 调用 LangGraph assistant，展示 assistant 输出、policy card 和最近 audit。
+- 客户上下文：展示 passenger profile、action timeline、operator notes 和 conversation summary。
+- 政策检索：按 query / service / policy_type 检索政策。
+- 受保护操作：演示受保护写操作，未确认时只返回确认提示。
+- 审计：查看最近 action audit logs、service tickets，并支持更新工单状态。
+- 数据分析：展示客服业务分析报告。
+
+## 可以问哪些问题
+
+咨询类：
+
+```text
+电子机票可以当发票吗？
+我可以在起飞前多久在线改签？
+酒店入住后还能取消吗？
+租车开始后还能修改吗？
+补开发票到底是 90 天还是 100 天？
+```
+
+写操作类：
+
+```text
+帮我取消票号 7240005432906569
+确认取消票号 7240005432906569
+帮我把票号 7240005432906569 改签到航班 1
+确认把票号 7240005432906569 改签到航班 1
+帮我取消酒店 1
+```
+
+复杂/高风险类：
+
+```text
+我想退票，不行的话帮我改签到明天下午
+我已经 check in 了酒店还能全额退吗？
+第三方买的票让你直接取消可以吗？
+活动开始后我迟到了能退款吗？
+```
 
 后端主要接口：
 
@@ -305,15 +336,17 @@ python tools/customer_analytics.py
 当前新版评测结果：
 
 ```text
-Retrieval V2: top1=0.7895, top3=0.9123, MRR=0.8421
-Guardrail: scenario_pass_rate=0.9, unsafe_execution_rate=0.0
-E2E: scenario_pass_rate=0.5667
+Retrieval V2 with BAAI/bge-m3: top1=0.7982, top3=0.9386, MRR=0.8640
+Guardrail with BAAI/bge-m3: scenario_pass_rate=0.75, unsafe_execution_rate=0.0
+E2E with BAAI/bge-m3: scenario_pass_rate=0.4333
 ```
 
 评测报告见：
 
 ```text
 analysis/retriever_eval_v2.md
+analysis/retriever_eval_local_hash.md
+analysis/embedding_comparison.md
 analysis/guardrail_eval.md
 analysis/e2e_eval.md
 analysis/eval_summary.md
