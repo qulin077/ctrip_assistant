@@ -14,6 +14,7 @@ except ImportError:
         return func
 
 from project_config import KB_VECTOR_STORE_DIR
+from tools.escalation_policy import infer_route_hint
 from tools.policy_vector_store import PolicyVectorStore
 
 
@@ -27,21 +28,46 @@ def lookup_policy_structured(
     top_k: int = 3,
     service: Optional[str] = None,
     policy_type: Optional[str] = None,
+    auto_route: bool = True,
 ) -> dict[str, Any]:
     """Return structured policy matches from the processed KB vector store."""
     store = get_policy_vector_store()
-    matches = store.search(
-        query=query,
-        top_k=top_k,
-        service=service,
-        policy_type=policy_type,
-    )
+    route_hint = infer_route_hint(query) if auto_route and not service and not policy_type else None
+    effective_service = service or (route_hint.service if route_hint else None)
+    effective_policy_type = policy_type or (route_hint.policy_type if route_hint else None)
+    if route_hint:
+        filtered_matches = store.search(
+            query=query,
+            top_k=1,
+            service=effective_service,
+            policy_type=effective_policy_type,
+        )
+        broad_matches = store.search(query=query, top_k=max(top_k * 3, top_k))
+        matches = []
+        seen_chunk_ids = set()
+        for match in [*filtered_matches, *broad_matches]:
+            chunk_id = match.get("chunk_id")
+            if chunk_id in seen_chunk_ids:
+                continue
+            seen_chunk_ids.add(chunk_id)
+            matches.append(match)
+            if len(matches) >= top_k:
+                break
+    else:
+        matches = store.search(
+            query=query,
+            top_k=top_k,
+            service=effective_service,
+            policy_type=effective_policy_type,
+        )
     return {
         "query": query,
         "top_k": top_k,
         "filters": {
-            "service": service,
-            "policy_type": policy_type,
+            "service": effective_service,
+            "policy_type": effective_policy_type,
+            "auto_route": bool(route_hint),
+            "is_multi_intent": bool(route_hint.is_multi_intent) if route_hint else False,
         },
         "matches": [
             {

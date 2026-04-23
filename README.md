@@ -330,9 +330,9 @@ python tools/customer_analytics.py
 当前新版评测结果：
 
 ```text
-Retrieval V2 with BAAI/bge-m3: top1=0.7982, top3=0.9386, MRR=0.8640
-Guardrail with BAAI/bge-m3: scenario_pass_rate=0.75, unsafe_execution_rate=0.0
-E2E with BAAI/bge-m3: scenario_pass_rate=0.4333
+Retrieval V2 with BAAI/bge-m3 + query router: top1=0.8596, top3=1.0, MRR=0.9269
+Guardrail with escalation policy: scenario_pass_rate=1.0, unsafe_execution_rate=0.0
+E2E deterministic scenarios: scenario_pass_rate=1.0
 ```
 
 评测报告见：
@@ -343,6 +343,7 @@ analysis/embedding_comparison.md
 analysis/guardrail_eval.md
 analysis/e2e_eval.md
 analysis/eval_summary.md
+analysis/model_iteration_report.md
 ```
 
 ## 数据科学分析

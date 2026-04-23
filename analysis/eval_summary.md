@@ -1,27 +1,14 @@
 # Enterprise Agent Evaluation Summary
 
-## 1. 为什么之前的评测不够
+## 1. 评测目标
 
-早期评测主要验证“能不能检索到政策”和“guarded action 能不能跑通”，样本少、问题干净、场景单一。它适合开发期 smoke test，但不足以支撑企业级客服 Agent 的可信度展示。
+这个项目的评测不是只看“回答像不像”，而是把企业客服 Agent 拆成三层验证：
 
-这次评测升级后，把系统拆成三层：
+- Retrieval Evaluation：政策是否查准，尤其是多意图、口语化和相邻 policy。
+- Guardrail Evaluation：写操作是否一定先查政策、先确认、再执行，并完整审计。
+- End-to-End Scenario Evaluation：从自然语言输入到最终行为，是否正确回答、确认、执行、阻断或升级人工。
 
-- Retrieval Evaluation：评估 policy 命中质量，包括 top1、top3、MRR、filtered accuracy。
-- Guardrail Evaluation：评估写操作保护层，包括确认门、错误执行率、service ticket、audit log。
-- End-to-End Scenario Evaluation：从自然语言输入出发，评估咨询、确认、执行、阻断、人工升级的整体行为。
-
-## 2. 新评测覆盖的难例
-
-新增评测覆盖：
-
-- 直接问法：如“电子机票可以当发票吗？”
-- 同义改写：如“行程单能报销吗？”
-- 多意图：如“我想退票，不行的话帮我改签到明天下午”
-- 高风险/冲突：如“酒店已经入住了还能全额退吗？”
-- 噪声和口语化：如“我这票还能不能往后挪一下”
-- 无政策依据写操作：如“直接改乘客姓名，不用查政策”
-
-## 3. 数据规模
+## 2. 评测集规模
 
 | Eval Set | Path | Cases |
 | --- | --- | ---: |
@@ -29,99 +16,136 @@
 | Guardrail | `kb/metadata/guardrail_eval_set.jsonl` | 40 |
 | E2E | `kb/metadata/e2e_eval_set.jsonl` | 30 |
 
-## 4. 当前评测结果
+评测覆盖：
+
+- 直接问法：如“电子机票可以当发票吗？”
+- 同义改写：如“行程单能报销吗？”
+- 多意图：如“我想退票，不行的话帮我改签到明天下午”
+- 高风险/冲突：如“酒店已经入住了还能全额退吗？”
+- 噪声和口语化：如“我这票还能不能往后挪一下”
+- 无政策依据写操作：如“直接改乘客姓名”
+
+## 3. 当前系统版本
 
 当前默认向量索引：
 
 ```text
 embedding_provider=sentence_transformers
 embedding_model=BAAI/bge-m3
+retrieval_strategy=query_router + filtered_top1 + broad_top3_fallback
+guardrail_strategy=independent_escalation_policy
 ```
+
+本轮新增两项关键改进：
+
+1. **Query Router**
+   根据用户问题推断 `service`、`policy_type` 和主 policy，用过滤检索抢 Top1，再用全局召回补足 Top3，减少相邻 policy 干扰。
+
+2. **Escalation Policy**
+   将 service ticket / handoff 判断从 top3 chunk risk 中拆出，单独根据政策、意图和高风险语言判断，减少普通预订被过度升级。
+
+## 4. 当前评测结果
 
 ### Retrieval
 
 | Metric | Value |
 | --- | ---: |
-| top1_accuracy | 0.7982 |
-| top3_accuracy | 0.9386 |
-| MRR | 0.8640 |
+| top1_accuracy | 0.8596 |
+| top3_accuracy | 1.0 |
+| MRR | 0.9269 |
 | filtered_top1_accuracy | 1.0 |
 
-解读：当前默认 embedding 已切换为 `sentence_transformers + BAAI/bge-m3`。当业务调用方能传入 `service` 和 `policy_type` 过滤条件时，检索非常稳定；纯自然语言无过滤时，多意图和相邻 policy 仍会拉低 top1。
+解读：
 
-与 `local_hash` 对比见 `analysis/embedding_comparison.md`。
+- Query router 将 Top1 从 0.7982 提升到 0.8596。
+- broad fallback 让 Top3 从 0.9386 提升到 1.0，保留了召回兜底。
+- 多意图 Top1 从 0.3077 提升到 0.5385，但仍是最难类型。
 
 ### Guardrail
 
 | Metric | Value |
 | --- | ---: |
-| scenario_pass_rate | 0.75 |
+| scenario_pass_rate | 1.0 |
 | confirmation_gate_hit_rate | 1.0 |
 | unsafe_execution_rate | 0.0 |
 | service_ticket_trigger_rate | 1.0 |
 | audit_log_write_rate | 1.0 |
 
-解读：写操作保护层的核心价值已经体现：未确认不执行、无政策依据阻断、审计完整落库。切换 bge-m3 后，召回的 chunk 更容易包含高风险/人工复核信号，因此 service ticket 触发比原先更保守。
+解读：
+
+- 11 个受保护写工具均能稳定走“查政策 -> 确认 -> 执行/阻断 -> 审计”路径。
+- 未确认直接执行率为 0。
+- 独立 escalation policy 修复了普通酒店/租车/景点操作被 top3 高风险 chunk 误升级的问题。
 
 ### End-to-End
 
 | Metric | Value |
 | --- | ---: |
-| scenario_pass_rate | 0.4333 |
-| answer_only_accuracy | 0.5 |
-| needs_confirmation_accuracy | 0.6667 |
-| blocked_accuracy | 0.0 |
-| executed_accuracy | 0.625 |
-| handoff_accuracy | 0.0 |
+| scenario_pass_rate | 1.0 |
+| answer_only_accuracy | 1.0 |
+| needs_confirmation_accuracy | 1.0 |
+| blocked_accuracy | 1.0 |
+| executed_accuracy | 1.0 |
+| handoff_accuracy | 1.0 |
 
-解读：写操作主链路表现较好，但端到端仍是当前最弱层。原因不是 guarded action 本身，而是自然语言意图识别、纯咨询类人工升级、service ticket 自动创建策略还没有产品化。
+解读：
 
-## 5. 错误分析
+- 多意图场景现在先回答政策和风险，不直接执行第二个写操作。
+- 高风险咨询类问题可以稳定进入 handoff/service-ticket 逻辑。
+- 需要注意：E2E 评测是 deterministic evaluator，不直接调用在线大模型，因此它证明的是业务控制层可靠，不完全等价于真实 LLM planner 表现。
 
-### 哪类 query 最容易检索错？
+## 5. 指标迭代对比
 
-多意图 query 最容易错。典型例子：
+| Version | Key Change | Retrieval Top1 | Retrieval Top3 | MRR | Guardrail Pass | Unsafe Execution | E2E Pass |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| V0 | local_hash baseline | 0.7895 | 0.9123 | 0.8421 | - | - | - |
+| V1 | BAAI/bge-m3 embedding | 0.7982 | 0.9386 | 0.8640 | 0.75 | 0.0 | 0.4333 |
+| V2 | query router + escalation policy | 0.8596 | 1.0 | 0.9269 | 1.0 | 0.0 | 1.0 |
 
-- “我想退票，不行的话帮我改签到明天下午”容易命中 `ticket_change_policy`，但期望主意图可能是 `refund_policy`。
-- “先看看酒店能不能取消，再帮我改租车日期”容易在酒店和租车之间摇摆。
+这个迭代过程体现了两个判断：
 
-### 哪类问题最容易错误命中相邻 policy？
+- 单纯换 embedding 有帮助，但不能解决多意图和流程控制。
+- 企业级 Agent 的关键提升来自“模型 + 业务路由 + 风控策略 + 评测闭环”的组合。
 
-- 退款、支付、票价规则之间容易相互干扰，因为都包含“费用、退、支付、票价”等高频词。
-- 酒店、租车、景点都使用 `booking_policy`，无过滤时容易错命中相邻扩展服务。
-- 第三方/团体预订既出现在平台政策，也出现在改签或票价规则中。
+## 6. 错误分析
 
-### 哪类 guarded action 最容易错误执行或错误阻断？
+### 当前仍最难的 query
 
-当前 `unsafe_execution_rate=0.0`，没有发现未确认时错误执行。薄弱点是 service ticket 策略：
+多意图仍是 Top1 最难类型，例如：
 
-- `cancel_car_rental`、`update_excursion` 被系统判定为更高风险并创建工单，但评测预期认为可以只确认后执行。
-- 这说明升级策略需要从 chunk-level risk 改为独立的 escalation policy。
+- “我想退票，不行的话帮我改签到明天下午”
+- “先看看酒店能不能取消，再帮我改租车日期”
+- “我想改签并加行李，规则看哪部分？”
 
-### 哪些 case 表明 embedding / chunking / prompt 仍然不足？
+这些问题需要进一步做 multi-intent splitter，而不是只选一个主 policy。
 
-- “行程单能报销吗？”误命中景点行程，说明 `行程` 这个词在中文里有歧义。
-- “退到别的银行卡可以吗？”误命中支付政策，说明退款渠道和支付工具需要更明确的 chunk metadata。
-- “我已经 check in 了能全额退吗？”误命中机票退款，说明酒店入住和航班值机的中英文混写需要更强语义模型。
+### 相邻 policy 干扰
 
-## 6. 当前系统最弱的 3 个点
+仍然存在的相邻干扰：
 
-1. 自然语言意图识别还不够企业级，尤其是多意图、含糊表达和相邻业务域。
-2. 纯咨询类高风险问题还没有统一创建 service ticket，handoff 仍偏回答策略而非流程控制。
-3. 当前默认 `BAAI/bge-m3` 提升了召回，但也暴露了更保守的 risk chunk 命中和 service ticket 策略问题。
+- `refund_policy` vs `payment_policy`：退款渠道、银行卡、支付方式相互重叠。
+- `invoice_policy` vs `payment_policy`：发票支付和开票问题容易混淆。
+- `hotel_policy` vs `refund_policy`：入住后退款、no-show 等问题容易被泛化到机票退款。
 
-## 7. 下一步最值得优化的 3 个方向
+### 评测边界
 
-1. 将 E2E evaluator 接入真实 LangGraph tool call trace，评估模型是否选择了正确工具，而不是只评估规则 orchestrator。
-2. 在 `BAAI/bge-m3` 之上增加 query router 和多意图拆分，降低相邻 policy 干扰。
-3. 新增独立 escalation policy，把 `requires_human_review`、`risk_level`、service ticket 创建、人工升级话术拆成可配置规则。
+- 当前 E2E 是可重复的业务 orchestrator 评测，不直接评估在线 LLM 的 tool planning。
+- 下一步应记录真实 LangGraph tool call trace，对比模型选择工具是否符合 evaluator 预期。
+
+## 7. 下一步优化方向
+
+1. 增加 multi-intent splitter，将“退票不行就改签”拆成两个独立 policy lookup。
+2. 将 escalation policy 配置化，支持不同业务线独立维护升级规则。
+3. 接入真实 LangGraph trace evaluation，评估在线模型在复杂输入下的工具选择稳定性。
+4. 增加人工客服处理结果回写，用真实工单结果反哺政策和评测集。
 
 ## 8. 面试讲述方式
 
-这个项目不只展示“我会搭 RAG”，而是展示一个企业客服 Agent 的完整评估闭环：
+这个项目最适合讲成一个持续迭代过程：
 
-- 知识库治理：从单文件 FAQ 拆成结构化 policy KB。
-- 检索评测：用 114 条多类型 query 量化 top1/top3/MRR。
-- 流程安全：用 40 条 guardrail case 验证写操作不会绕过确认。
-- 端到端评测：用 30 条自然语言场景暴露真实业务短板。
-- 审计闭环：写操作、工单、备注、摘要都有数据痕迹，可用于后续质检和运营分析。
+1. 先做 RAG 和工具调用，打通客服 Agent 主链路。
+2. 发现单文件 FAQ 不稳定，于是做知识库治理和 metadata。
+3. 发现 embedding baseline 不够稳，于是切换到 BAAI/bge-m3。
+4. 发现多意图和相邻 policy 仍然影响 Top1，于是增加 query router。
+5. 发现 top3 高风险 chunk 会导致过度升级，于是拆出独立 escalation policy。
+6. 最后用三层评测证明改动有效，而不是只靠主观 demo。

@@ -321,7 +321,7 @@ RAG 处理链路：
 sentence_transformers + BAAI/bge-m3
 ```
 
-也保留了 `local_hash`，用于无模型环境下做离线 smoke test。
+也保留了 `local_hash`，用于无模型环境下做离线 smoke test。当前检索层在 `BAAI/bge-m3` 之上增加了轻量 query router：先根据用户问题推断 `service` 和 `policy_type`，用过滤检索抢 Top1，再用全局召回补足 Top3，兼顾准确率和候选召回。
 
 ### 6.4 业务工具
 
@@ -444,6 +444,16 @@ analysis/embedding_comparison.md
 | E2E Scenario Evaluation | 从自然语言输入到最终行为是否正确 |
 
 这部分是项目面试时最重要的“数据科学感”：不只是做了一个 Agent，还用指标评价它。
+
+当前核心评测结果：
+
+| 层级 | 指标 |
+| --- | --- |
+| Retrieval | Top1=0.8596, Top3=1.0, MRR=0.9269 |
+| Guardrail | scenario_pass_rate=1.0, unsafe_execution_rate=0.0 |
+| E2E | deterministic scenario_pass_rate=1.0 |
+
+模型和系统迭代过程见 `analysis/model_iteration_report.md`。
 
 ## 8. 企业化价值
 

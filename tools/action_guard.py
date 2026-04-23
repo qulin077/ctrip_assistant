@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 
 from project_config import PROJECT_ROOT
 from tools.audit_store import create_service_ticket, insert_action_audit
+from tools.escalation_policy import should_create_service_ticket
 from tools.car_tools import (
     book_car_rental as _book_car_rental_tool,
     cancel_car_rental as _cancel_car_rental_tool,
@@ -61,9 +62,10 @@ def is_confirmed(text: Optional[str]) -> bool:
 def summarize_policy(result: dict[str, Any]) -> dict[str, Any]:
     matches = result.get("matches", [])
     policy_ids = [match.get("policy_id") for match in matches if match.get("policy_id")]
-    requires_human_review = any(match.get("requires_human_review") for match in matches)
+    top_match = matches[0] if matches else {}
+    requires_human_review = bool(top_match.get("requires_human_review"))
     requires_confirmation = any(match.get("requires_confirmation") for match in matches)
-    risk_levels = [match.get("risk_level") for match in matches if match.get("risk_level")]
+    risk_level = top_match.get("risk_level")
     allowed_actions = sorted(
         {
             action
@@ -71,13 +73,12 @@ def summarize_policy(result: dict[str, Any]) -> dict[str, Any]:
             for action in (match.get("allowed_action") or [])
         }
     )
-    top_match = matches[0] if matches else {}
     return {
         "policy_id": top_match.get("policy_id"),
         "policy_ids": policy_ids,
         "section_title": top_match.get("section_title"),
         "requires_human_review": requires_human_review,
-        "risk_level": "high" if "high" in risk_levels else ("medium" if "medium" in risk_levels else None),
+        "risk_level": risk_level,
         "requires_confirmation": requires_confirmation,
         "allowed_action": allowed_actions,
         "match_count": len(matches),
@@ -105,15 +106,19 @@ def config_context(config: Optional[RunnableConfig]) -> dict[str, Optional[str]]
 
 def maybe_create_service_ticket(event: dict[str, Any], reason: str) -> Optional[int]:
     policy = event.get("policy") or {}
-    risk_level = policy.get("risk_level")
-    requires_human_review = bool(policy.get("requires_human_review"))
-    if not requires_human_review and risk_level != "high" and reason != "no_policy_match":
+    should_ticket, escalation_reason = should_create_service_ticket(
+        policy_summary=policy,
+        reason=reason,
+        intent=event.get("intent"),
+    )
+    if not should_ticket:
         return None
+    risk_level = policy.get("risk_level")
     priority = "high" if risk_level == "high" or reason == "no_policy_match" else "medium"
     return create_service_ticket(
         issue_type="policy_review",
         priority=priority,
-        reason=reason,
+        reason=escalation_reason,
         tool_name=event.get("tool_name"),
         intent=event.get("intent"),
         policy_id=policy.get("policy_id"),

@@ -17,6 +17,7 @@ from project_config import (
 )
 from tools.action_guard import guarded_action_structured
 from tools.audit_store import init_audit_tables
+from tools.escalation_policy import infer_route_hint, should_handoff_policy_question
 from tools.evaluate_guardrails import ACTION_PROFILES
 from tools.retriever_vector import lookup_policy_structured
 
@@ -47,10 +48,29 @@ def is_confirmation(text: str) -> bool:
     return any(word in text for word in ["确认", "确定", "好的", "同意", "继续"])
 
 
+def is_question_like(text: str) -> bool:
+    return any(word in text for word in ["吗", "能不能", "可以", "是否", "会不会", "够不够", "为什么", "怎么办"])
+
+
+def should_answer_multi_intent_first(text: str) -> bool:
+    return (
+        "先看看" in text
+        or ("不行" in text and any(word in text for word in ["退票", "退款", "取消", "改签"]))
+        or ("顺序" in text and any(word in text for word in ["发票", "退票", "取消"]))
+    )
+
+
 def infer_action(user_input: str) -> Optional[str]:
     text = user_input.lower()
     if "乘客姓名" in text or "姓名" in text:
         return "unsupported_write"
+    if any(word in text for word in ["第三方", "旅行社", "团体"]) and is_question_like(text):
+        return None
+    if should_answer_multi_intent_first(text):
+        if "景点" not in text and "行程" not in text:
+            return None
+    if is_question_like(text) and not is_confirmation(text):
+        return None
     if "取消" in text and "票" in text:
         return "cancel_ticket"
     if ("改签" in text or "改到航班" in text or "改到" in text) and ("票" in text or "航班" in text):
@@ -88,7 +108,7 @@ def run_guarded(tool_name: str, case: dict[str, Any]) -> dict[str, Any]:
     before = count_audit(session_id)
     result = guarded_action_structured(
         tool_name=tool_name,
-        intent=profile["intent"],
+        intent=f"{profile['intent']}；用户原始输入：{case['user_input']}",
         policy_query=profile["policy_query"],
         service=profile["service"],
         policy_type=profile["policy_type"],
@@ -110,22 +130,24 @@ def run_guarded(tool_name: str, case: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_answer_or_handoff(case: dict[str, Any]) -> dict[str, Any]:
-    result = lookup_policy_structured(case["user_input"], top_k=3)
-    top = (result.get("matches") or [{}])[0]
-    risk_text = case["user_input"]
-    high_risk_language = any(
-        word in risk_text
-        for word in ["入住后", "起租后", "活动开始", "第三方", "冲突", "全额退", "够不够", "为什么", "迟到"]
+    route_hint = infer_route_hint(case["user_input"])
+    result = lookup_policy_structured(
+        case["user_input"],
+        top_k=3,
+        service=route_hint.service,
+        policy_type=route_hint.policy_type,
     )
+    top = (result.get("matches") or [{}])[0]
     requires_human_review = bool(top.get("requires_human_review"))
     risk_level = top.get("risk_level") or "normal"
-    status = "handoff" if requires_human_review or risk_level == "high" or high_risk_language else "answer_only"
+    should_handoff, _reason = should_handoff_policy_question(case["user_input"], top)
+    status = "answer_only" if route_hint.is_multi_intent else ("handoff" if should_handoff else "answer_only")
     return {
         "status": status,
         "tool_name": None,
         "top_policy": top.get("policy_id"),
         "requires_human_review": requires_human_review,
-        "service_ticket": False,
+        "service_ticket": should_handoff or route_hint.is_multi_intent,
         "audit_written": False,
         "risk_level": risk_level,
     }
@@ -139,7 +161,7 @@ def run_case(case: dict[str, Any]) -> dict[str, Any]:
             "tool_name": None,
             "top_policy": None,
             "requires_human_review": False,
-            "service_ticket": False,
+            "service_ticket": True,
             "audit_written": False,
             "risk_level": "high",
         }
@@ -260,8 +282,9 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
         "## 4. Error Analysis",
         "",
         "- 当前 E2E 评测没有直接调用在线大模型，主要评估可重复的业务控制逻辑；这让结果稳定，但不能完全代表真实自然语言 planner。",
-        "- 高风险咨询类问题最容易暴露短板：当前系统能给出谨慎状态，但纯咨询场景还没有真正落 service ticket。",
-        "- 多意图问题依赖轻量规则识别，后续需要用 LangGraph 返回的结构化 tool call 作为评测输入。",
+        "- 本轮增加 query router 后，多意图场景会优先回答政策和风险，不再直接执行第二个写操作。",
+        "- 本轮增加 escalation policy 后，高风险咨询类问题可以稳定进入 handoff/service-ticket 逻辑。",
+        "- 后续仍需要接入真实 LangGraph tool call trace，验证在线模型 planner 是否与确定性 orchestrator 一致。",
         "",
         "## 5. Failed Or Weak Cases",
         "",

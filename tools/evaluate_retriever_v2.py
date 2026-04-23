@@ -136,8 +136,8 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
     provider = str(embedding.get("embedding_provider") or "")
     if provider.startswith("sentence_transformers"):
         embedding_note = (
-            "`BAAI/bge-m3` 提升了语义召回，但多意图 query 仍需要 query router "
-            "或意图拆分来减少相邻 policy 干扰。"
+            "`BAAI/bge-m3` 提升了语义召回；当前版本叠加 query router 与 broad fallback，"
+            "在提高 Top1 的同时保留 Top3 候选召回。"
         )
     else:
         embedding_note = (
@@ -180,8 +180,8 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
         "",
         "## 6. Error Analysis",
         "",
-        "- 多意图和高风险 query 最容易错，因为一个问题里同时出现退票、改签、酒店、租车等多个相邻业务意图。",
-        "- 相邻 policy 的误命中主要发生在退款、票价规则、支付退款之间，以及酒店/租车/景点三个 `booking_policy` 类型之间。",
+        "- Query router 已显著改善多意图和相邻 policy 的 Top1 表现，但多意图仍是最难类型。",
+        "- 仍然存在的相邻 policy 干扰主要发生在退款/支付/发票支付，以及酒店退款/泛化退款之间。",
         f"- {embedding_note}",
         "",
         "## 7. Failed Or Weak Cases",
