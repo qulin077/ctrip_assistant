@@ -6,20 +6,20 @@
 | --- | --- |
 | bookings | 262788 |
 | tickets | 366733 |
-| ticket_flights | 1045724 |
+| ticket_flights | 1045726 |
 | flights | 33121 |
 | boarding_passes | 579686 |
 | hotels | 10 |
 | car_rentals | 10 |
 | trip_recommendations | 10 |
-| action_audit_logs | 2 |
-| service_tickets | 1 |
+| action_audit_logs | 129 |
+| service_tickets | 104 |
 
 ## 2. 订单与服务覆盖
 
 - 唯一乘客数：`366733`
 - 航班票号数：`366733`
-- 航段票数：`1045724`
+- 航段票数：`1045726`
 - 已预订酒店数：`0`
 - 已预订租车数：`0`
 - 已预订景点/行程数：`0`
@@ -30,7 +30,7 @@
 
 | Fare Condition | Count |
 | --- | --- |
-| Economy | 920791 |
+| Economy | 920793 |
 | Business | 107642 |
 | Comfort | 17291 |
 
@@ -51,35 +51,38 @@
 
 ## 4. Guardrail 与审计指标
 
-- 写操作审计记录数：`2`
-- 已执行写操作数：`1`
-- 被阻止/等待确认数：`1`
-- 需要确认的记录数：`2`
-- 命中人工复核政策数：`1`
-- 高风险记录数：`1`
+- 写操作审计记录数：`129`
+- 已执行写操作数：`49`
+- 被阻止/等待确认数：`80`
+- 需要确认的记录数：`129`
+- 命中人工复核政策数：`24`
+- 高风险记录数：`88`
 
 ### 命中政策分布
 
 | Policy | Hits |
 | --- | --- |
-| ticket_change_policy | 1 |
-| refund_policy | 1 |
+| car_rental_policy | 32 |
+| refund_policy | 24 |
+| hotel_policy | 24 |
+| excursion_policy | 22 |
+| ticket_change_policy | 11 |
 
 ## 5. 人工工单指标
 
-- service ticket 总数：`1`
+- service ticket 总数：`104`
 
 ### 工单优先级
 
 | Priority | Count |
 | --- | --- |
-| high | 1 |
+| high | 104 |
 
 ### 工单状态
 
 | Status | Count |
 | --- | --- |
-| open | 1 |
+| open | 104 |
 
 ## 6. 面试讲述重点
 

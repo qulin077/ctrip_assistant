@@ -150,7 +150,7 @@ execute_guarded_action_structured(...)
 ```bash
 python tools/test_api.py
 python tools/test_guarded_actions.py
-python tools/evaluate_policy_retriever.py
+python tools/evaluate_retriever_v2.py
 ```
 
 预期：

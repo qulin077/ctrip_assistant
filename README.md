@@ -202,7 +202,7 @@ pip install -r requirements.txt
 推荐从项目根目录以模块方式运行：
 
 ```bash
-python -m graph_chat.第一个流程图
+python -m graph_chat.cli
 ```
 
 程序会先用 `travel2.sqlite` 重置 `travel_new.sqlite`，再进入命令行对话。
@@ -295,12 +295,6 @@ POST /api/analytics/report
 python tools/test_policy_retriever.py
 ```
 
-政策检索评测：
-
-```bash
-python tools/evaluate_policy_retriever.py
-```
-
 写操作保护测试：
 
 ```bash
@@ -345,7 +339,6 @@ E2E with BAAI/bge-m3: scenario_pass_rate=0.4333
 
 ```text
 analysis/retriever_eval_v2.md
-analysis/retriever_eval_local_hash.md
 analysis/embedding_comparison.md
 analysis/guardrail_eval.md
 analysis/e2e_eval.md
