@@ -1,7 +1,9 @@
-# Retriever Evaluation V2
+# Retriever Evaluation
 
 ## 1. Evaluation Setup
 
+- Eval split: `regression`
+- Eval set: `/Users/qulin/Desktop/AI/ai project/ctrip_assistant/kb/metadata/retriever_eval_regression.jsonl`
 - Eval cases: 114
 - Top K: 3
 - Embedding provider: `sentence_transformers:BAAI/bge-m3`
@@ -45,17 +47,24 @@
 | hotel | 12 | 0.8333 | 1.0 | 0.9028 | 1.0 |
 | payment | 12 | 0.6667 | 1.0 | 0.8194 | 1.0 |
 
-## 6. Error Analysis
+## 6. Multi-Intent And Cross-Domain
+
+| subset | total | top1 | top3 | MRR | filtered_top1 |
+| --- | --- | --- | --- | --- | --- |
+| multi_intent | 13 | 0.5385 | 1.0 | 0.7564 | 1.0 |
+| cross_domain | 0 | 0 | 0 | 0 | 0 |
+
+## 7. Error Analysis
 
 - Query router 已显著改善多意图和相邻 policy 的 Top1 表现，但多意图仍是最难类型。
 - 仍然存在的相邻 policy 干扰主要发生在退款/支付/发票支付，以及酒店退款/泛化退款之间。
 - `BAAI/bge-m3` 提升了语义召回；当前版本叠加 query router 与 broad fallback，在提高 Top1 的同时保留 Top3 候选召回。
 
-## 7. Failed Or Weak Cases
+## 8. Failed Or Weak Cases
 
 All cases hit expected policy within top 3.
 
-## 8. Top1 Misses For Review
+## 9. Top1 Misses For Review
 
 | query | expected | top_policy | query_type | difficulty |
 | --- | --- | --- | --- | --- |

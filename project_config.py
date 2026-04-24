@@ -19,8 +19,17 @@ KB_CHUNKS_PATH = PROJECT_ROOT / "kb" / "processed" / "chunks.jsonl"
 KB_VECTOR_STORE_DIR = PROJECT_ROOT / "kb" / "processed" / "vector_store"
 KB_RETRIEVER_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_set.jsonl"
 KB_RETRIEVER_EVAL_SET_V2_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_set_v2.jsonl"
+KB_RETRIEVER_EVAL_REGRESSION_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_regression.jsonl"
+KB_RETRIEVER_EVAL_HOLDOUT_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_holdout.jsonl"
+KB_RETRIEVER_EVAL_STRESS_PATH = PROJECT_ROOT / "kb" / "metadata" / "retriever_eval_stress.jsonl"
 KB_GUARDRAIL_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "guardrail_eval_set.jsonl"
+KB_GUARDRAIL_EVAL_REGRESSION_PATH = PROJECT_ROOT / "kb" / "metadata" / "guardrail_eval_regression.jsonl"
+KB_GUARDRAIL_EVAL_HOLDOUT_PATH = PROJECT_ROOT / "kb" / "metadata" / "guardrail_eval_holdout.jsonl"
+KB_GUARDRAIL_EVAL_STRESS_PATH = PROJECT_ROOT / "kb" / "metadata" / "guardrail_eval_stress.jsonl"
 KB_E2E_EVAL_SET_PATH = PROJECT_ROOT / "kb" / "metadata" / "e2e_eval_set.jsonl"
+KB_E2E_EVAL_REGRESSION_PATH = PROJECT_ROOT / "kb" / "metadata" / "e2e_eval_regression.jsonl"
+KB_E2E_EVAL_HOLDOUT_PATH = PROJECT_ROOT / "kb" / "metadata" / "e2e_eval_holdout.jsonl"
+KB_E2E_EVAL_STRESS_PATH = PROJECT_ROOT / "kb" / "metadata" / "e2e_eval_stress.jsonl"
 
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimaxi.com/v1")

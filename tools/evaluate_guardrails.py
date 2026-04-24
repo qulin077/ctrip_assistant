@@ -11,7 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from project_config import (
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
+    KB_GUARDRAIL_EVAL_HOLDOUT_PATH,
+    KB_GUARDRAIL_EVAL_REGRESSION_PATH,
     KB_GUARDRAIL_EVAL_SET_PATH,
+    KB_GUARDRAIL_EVAL_STRESS_PATH,
     KB_VECTOR_STORE_DIR,
     TRAVEL_DB_PATH,
 )
@@ -176,6 +179,8 @@ def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     should_confirm = [row for row in rows if row["expected_status"] == "needs_confirmation"]
     ticket_expected = [row for row in rows if row["expected_service_ticket"]]
+    multi_intent = [row for row in rows if row.get("is_multi_intent")]
+    cross_domain = [row for row in rows if row.get("cross_domain")]
     return {
         "total": total,
         "scenario_pass_rate": round(
@@ -206,7 +211,27 @@ def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         else 0,
         "audit_log_write_rate": round(sum(row["audit_written"] for row in rows) / total, 4) if total else 0,
         "status_counts": dict(Counter(row["actual_status"] for row in rows)),
+        "multi_intent_total": len(multi_intent),
+        "multi_intent_pass_rate": scenario_pass_rate(multi_intent),
+        "cross_domain_total": len(cross_domain),
+        "cross_domain_pass_rate": scenario_pass_rate(cross_domain),
     }
+
+
+def scenario_pass_rate(rows: list[dict[str, Any]]) -> float:
+    if not rows:
+        return 0
+    return round(
+        sum(
+            row["status_pass"]
+            and row["execution_pass"]
+            and row["confirmation_pass"]
+            and row["service_ticket_pass"]
+            for row in rows
+        )
+        / len(rows),
+        4,
+    )
 
 
 def grouped(rows: list[dict[str, Any]], key: str) -> dict[str, float]:
@@ -229,7 +254,16 @@ def table(headers: list[str], rows: list[list[Any]]) -> list[str]:
     return lines
 
 
-def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_path: Path) -> None:
+def split_eval_path(split: str) -> Path:
+    paths = {
+        "regression": KB_GUARDRAIL_EVAL_REGRESSION_PATH,
+        "holdout": KB_GUARDRAIL_EVAL_HOLDOUT_PATH,
+        "stress": KB_GUARDRAIL_EVAL_STRESS_PATH,
+    }
+    return paths[split]
+
+
+def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_path: Path, split: str, eval_set: Path) -> None:
     failures = [
         row
         for row in rows
@@ -246,6 +280,8 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
         "",
         "## 1. Evaluation Setup",
         "",
+        f"- Eval split: `{split}`",
+        f"- Eval set: `{eval_set}`",
         f"- Eval cases: {summary['total']}",
         f"- Embedding provider: `{embedding.get('embedding_provider')}`",
         f"- Embedding model: `{embedding.get('embedding_model')}`",
@@ -262,6 +298,10 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
                 ["service_ticket_trigger_rate", summary["service_ticket_trigger_rate"]],
                 ["audit_log_write_rate", summary["audit_log_write_rate"]],
                 ["status_counts", json.dumps(summary["status_counts"], ensure_ascii=False)],
+                ["multi_intent_cases", summary["multi_intent_total"]],
+                ["multi_intent_pass_rate", summary["multi_intent_pass_rate"]],
+                ["cross_domain_cases", summary["cross_domain_total"]],
+                ["cross_domain_pass_rate", summary["cross_domain_pass_rate"]],
             ],
         ),
         "",
@@ -305,16 +345,23 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate guarded write action behavior.")
-    parser.add_argument("--eval-set", type=Path, default=KB_GUARDRAIL_EVAL_SET_PATH)
-    parser.add_argument("--out", type=Path, default=Path("analysis/guardrail_eval.md"))
+    parser.add_argument("--split", choices=["regression", "holdout", "stress"], default="regression")
+    parser.add_argument("--eval-set", type=Path)
+    parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 
+    eval_set = args.eval_set or split_eval_path(args.split)
+    out = args.out or Path(
+        "analysis/guardrail_eval.md"
+        if args.split == "regression"
+        else f"analysis/guardrail_eval_{args.split}.md"
+    )
     init_audit_tables()
-    rows = [run_case(case) for case in read_jsonl(args.eval_set)]
+    rows = [run_case(case) for case in read_jsonl(eval_set)]
     summary = metrics(rows)
-    write_report(rows, summary, args.out)
+    write_report(rows, summary, out, args.split, eval_set)
     print(json.dumps(summary, ensure_ascii=False))
-    print(f"Wrote report to {args.out}")
+    print(f"Wrote report to {out}")
 
 
 if __name__ == "__main__":

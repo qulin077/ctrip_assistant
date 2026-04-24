@@ -10,7 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from project_config import (
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
+    KB_RETRIEVER_EVAL_HOLDOUT_PATH,
+    KB_RETRIEVER_EVAL_REGRESSION_PATH,
     KB_RETRIEVER_EVAL_SET_V2_PATH,
+    KB_RETRIEVER_EVAL_STRESS_PATH,
     KB_VECTOR_STORE_DIR,
 )
 from tools.retriever_vector import lookup_policy_structured
@@ -46,6 +49,10 @@ def metric_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "mrr": round(sum(row["rr"] for row in rows) / total, 4),
         "filtered_top1_accuracy": round(sum(row["hit_filtered_top1"] for row in rows) / total, 4),
     }
+
+
+def case_is_multi_intent(row: dict[str, Any]) -> bool:
+    return bool(row.get("is_multi_intent")) or row.get("query_type") == "multi_intent"
 
 
 def grouped(rows: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]:
@@ -95,6 +102,8 @@ def evaluate(eval_set_path: Path, top_k: int = 3) -> tuple[list[dict[str, Any]],
         "by_query_type": grouped(rows, "query_type"),
         "by_difficulty": grouped(rows, "difficulty"),
         "by_service": grouped(rows, "expected_service"),
+        "multi_intent": metric_block([row for row in rows if case_is_multi_intent(row)]),
+        "cross_domain": metric_block([row for row in rows if row.get("cross_domain")]),
         "embedding": load_manifest(),
         "top_k": top_k,
     }
@@ -125,7 +134,16 @@ def metric_rows(metrics: dict[str, dict[str, Any]]) -> list[list[Any]]:
     ]
 
 
-def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_path: Path) -> None:
+def split_eval_path(split: str) -> Path:
+    paths = {
+        "regression": KB_RETRIEVER_EVAL_REGRESSION_PATH,
+        "holdout": KB_RETRIEVER_EVAL_HOLDOUT_PATH,
+        "stress": KB_RETRIEVER_EVAL_STRESS_PATH,
+    }
+    return paths[split]
+
+
+def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_path: Path, split: str, eval_set: Path) -> None:
     failed = [row for row in rows if not row["hit_top3"]]
     adjacent = [
         row
@@ -145,10 +163,12 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
             "不如语义向量模型稳定。"
         )
     lines = [
-        "# Retriever Evaluation V2",
+        "# Retriever Evaluation",
         "",
         "## 1. Evaluation Setup",
         "",
+        f"- Eval split: `{split}`",
+        f"- Eval set: `{eval_set}`",
         f"- Eval cases: {metrics['overall']['total']}",
         f"- Top K: {metrics['top_k']}",
         f"- Embedding provider: `{embedding.get('embedding_provider')}`",
@@ -178,13 +198,20 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
         "",
         *table(["service", "total", "top1", "top3", "MRR", "filtered_top1"], metric_rows(metrics["by_service"])),
         "",
-        "## 6. Error Analysis",
+        "## 6. Multi-Intent And Cross-Domain",
+        "",
+        *table(
+            ["subset", "total", "top1", "top3", "MRR", "filtered_top1"],
+            metric_rows({"multi_intent": metrics["multi_intent"], "cross_domain": metrics["cross_domain"]}),
+        ),
+        "",
+        "## 7. Error Analysis",
         "",
         "- Query router 已显著改善多意图和相邻 policy 的 Top1 表现，但多意图仍是最难类型。",
         "- 仍然存在的相邻 policy 干扰主要发生在退款/支付/发票支付，以及酒店退款/泛化退款之间。",
         f"- {embedding_note}",
         "",
-        "## 7. Failed Or Weak Cases",
+        "## 8. Failed Or Weak Cases",
         "",
     ]
     if failed:
@@ -206,7 +233,7 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
     else:
         lines.append("All cases hit expected policy within top 3.")
 
-    lines.extend(["", "## 8. Top1 Misses For Review", ""])
+    lines.extend(["", "## 9. Top1 Misses For Review", ""])
     top1_misses = [row for row in rows if not row["hit_top1"]]
     if top1_misses:
         lines.extend(
@@ -232,15 +259,22 @@ def write_report(rows: list[dict[str, Any]], metrics: dict[str, Any], output_pat
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate policy retrieval on a larger enterprise-style set.")
-    parser.add_argument("--eval-set", type=Path, default=KB_RETRIEVER_EVAL_SET_V2_PATH)
+    parser.add_argument("--split", choices=["regression", "holdout", "stress"], default="regression")
+    parser.add_argument("--eval-set", type=Path)
     parser.add_argument("--top-k", type=int, default=3)
-    parser.add_argument("--out", type=Path, default=Path("analysis/retriever_eval_v2.md"))
+    parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 
-    rows, metrics = evaluate(args.eval_set, args.top_k)
-    write_report(rows, metrics, args.out)
+    eval_set = args.eval_set or split_eval_path(args.split)
+    out = args.out or Path(
+        "analysis/retriever_eval_v2.md"
+        if args.split == "regression"
+        else f"analysis/retriever_eval_{args.split}.md"
+    )
+    rows, metrics = evaluate(eval_set, args.top_k)
+    write_report(rows, metrics, out, args.split, eval_set)
     print(json.dumps(metrics["overall"], ensure_ascii=False))
-    print(f"Wrote report to {args.out}")
+    print(f"Wrote report to {out}")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from project_config import (
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
+    KB_E2E_EVAL_HOLDOUT_PATH,
+    KB_E2E_EVAL_REGRESSION_PATH,
     KB_E2E_EVAL_SET_PATH,
+    KB_E2E_EVAL_STRESS_PATH,
     KB_VECTOR_STORE_DIR,
     TRAVEL_DB_PATH,
 )
@@ -232,12 +235,25 @@ def evaluate(eval_set_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]
         "handoff_accuracy": accuracy(rows, "handoff"),
         "status_counts": dict(Counter(row["actual_status"] for row in rows)),
         "by_intent": grouped(rows, "expected_intent"),
+        "multi_intent_total": len([row for row in rows if row.get("is_multi_intent")]),
+        "multi_intent_accuracy": accuracy([row for row in rows if row.get("is_multi_intent")]),
+        "cross_domain_total": len([row for row in rows if row.get("cross_domain")]),
+        "cross_domain_accuracy": accuracy([row for row in rows if row.get("cross_domain")]),
         "embedding": load_manifest(),
     }
     return rows, summary
 
 
-def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_path: Path) -> None:
+def split_eval_path(split: str) -> Path:
+    paths = {
+        "regression": KB_E2E_EVAL_REGRESSION_PATH,
+        "holdout": KB_E2E_EVAL_HOLDOUT_PATH,
+        "stress": KB_E2E_EVAL_STRESS_PATH,
+    }
+    return paths[split]
+
+
+def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_path: Path, split: str, eval_set: Path) -> None:
     failures = [
         row
         for row in rows
@@ -255,6 +271,8 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
         "",
         "## 1. Evaluation Setup",
         "",
+        f"- Eval split: `{split}`",
+        f"- Eval set: `{eval_set}`",
         f"- Eval cases: {summary['total']}",
         f"- Embedding provider: `{embedding.get('embedding_provider')}`",
         f"- Embedding model: `{embedding.get('embedding_model')}`",
@@ -272,6 +290,10 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
                 ["executed_accuracy", summary["executed_accuracy"]],
                 ["handoff_accuracy", summary["handoff_accuracy"]],
                 ["status_counts", json.dumps(summary["status_counts"], ensure_ascii=False)],
+                ["multi_intent_cases", summary["multi_intent_total"]],
+                ["multi_intent_accuracy", summary["multi_intent_accuracy"]],
+                ["cross_domain_cases", summary["cross_domain_total"]],
+                ["cross_domain_accuracy", summary["cross_domain_accuracy"]],
             ],
         ),
         "",
@@ -325,14 +347,17 @@ def write_report(rows: list[dict[str, Any]], summary: dict[str, Any], output_pat
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate end-to-end customer service scenarios.")
-    parser.add_argument("--eval-set", type=Path, default=KB_E2E_EVAL_SET_PATH)
-    parser.add_argument("--out", type=Path, default=Path("analysis/e2e_eval.md"))
+    parser.add_argument("--split", choices=["regression", "holdout", "stress"], default="regression")
+    parser.add_argument("--eval-set", type=Path)
+    parser.add_argument("--out", type=Path)
     args = parser.parse_args()
 
-    rows, summary = evaluate(args.eval_set)
-    write_report(rows, summary, args.out)
+    eval_set = args.eval_set or split_eval_path(args.split)
+    out = args.out or Path("analysis/e2e_eval.md" if args.split == "regression" else f"analysis/e2e_eval_{args.split}.md")
+    rows, summary = evaluate(eval_set)
+    write_report(rows, summary, out, args.split, eval_set)
     print(json.dumps({key: value for key, value in summary.items() if key != "by_intent"}, ensure_ascii=False))
-    print(f"Wrote report to {args.out}")
+    print(f"Wrote report to {out}")
 
 
 if __name__ == "__main__":

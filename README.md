@@ -307,18 +307,29 @@ python tools/test_guarded_actions.py
 python tools/test_api.py
 ```
 
-生成新版评测集：
-
-```bash
-python tools/generate_eval_sets.py
-```
-
 三层企业级评测：
 
 ```bash
-python tools/evaluate_retriever_v2.py
-python tools/evaluate_guardrails.py
-python tools/evaluate_e2e.py
+python tools/evaluate_retriever_v2.py --split regression
+python tools/evaluate_guardrails.py --split regression
+python tools/evaluate_e2e.py --split regression
+
+python tools/evaluate_retriever_v2.py --split holdout
+python tools/evaluate_guardrails.py --split holdout
+python tools/evaluate_e2e.py --split holdout
+
+python tools/evaluate_retriever_v2.py --split stress
+python tools/evaluate_guardrails.py --split stress
+python tools/evaluate_e2e.py --split stress
+```
+
+真实 LangGraph planner trace 评测：
+
+```bash
+python tools/evaluate_langgraph_trace.py \
+  --eval-set kb/metadata/e2e_eval_holdout.jsonl \
+  --limit 12 \
+  --per-case-timeout 120
 ```
 
 生成业务分析报告：
@@ -330,19 +341,46 @@ python tools/customer_analytics.py
 当前新版评测结果：
 
 ```text
-Retrieval V2 with BAAI/bge-m3 + query router: top1=0.8596, top3=1.0, MRR=0.9269
-Guardrail with escalation policy: scenario_pass_rate=1.0, unsafe_execution_rate=0.0
-E2E deterministic scenarios: scenario_pass_rate=1.0
+Regression:
+  Retrieval top1=0.8596, top3=1.0, MRR=0.9269
+  Guardrail scenario_pass_rate=1.0, unsafe_execution_rate=0.0
+  E2E deterministic scenario_pass_rate=1.0
+
+Holdout:
+  Retrieval top1=0.6875, top3=0.8438
+  Guardrail scenario_pass_rate=0.6875, unsafe_execution_rate=0.0
+  E2E deterministic scenario_pass_rate=0.5588
+
+Stress:
+  Retrieval top1=0.6444, top3=0.8444
+  Guardrail scenario_pass_rate=0.7045, unsafe_execution_rate=0.0
+  E2E deterministic scenario_pass_rate=0.3250
+
+LangGraph Trace Holdout:
+  trace_pass_rate=0.4167
+  policy_lookup_pass_rate=0.8333
+  tool_selection_pass_rate=0.5833
+  guarded_order_pass_rate=1.0
+  unsupported_safe_rate=1.0
 ```
 
 评测报告见：
 
 ```text
+analysis/project_story.md
+analysis/evaluation_questions.md
+analysis/eval_protocol.md
 analysis/retriever_eval_v2.md
-analysis/embedding_comparison.md
+analysis/retriever_eval_holdout.md
+analysis/retriever_eval_stress.md
 analysis/guardrail_eval.md
+analysis/guardrail_eval_holdout.md
+analysis/guardrail_eval_stress.md
 analysis/e2e_eval.md
-analysis/eval_summary.md
+analysis/e2e_eval_holdout.md
+analysis/e2e_eval_stress.md
+analysis/langgraph_trace_eval.md
+analysis/resume_data_science.md
 analysis/model_iteration_report.md
 ```
 

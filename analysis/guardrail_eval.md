@@ -2,6 +2,8 @@
 
 ## 1. Evaluation Setup
 
+- Eval split: `regression`
+- Eval set: `/Users/qulin/Desktop/AI/ai project/ctrip_assistant/kb/metadata/guardrail_eval_regression.jsonl`
 - Eval cases: 40
 - Embedding provider: `sentence_transformers:BAAI/bge-m3`
 - Embedding model: `BAAI/bge-m3`
@@ -17,6 +19,10 @@
 | service_ticket_trigger_rate | 1.0 |
 | audit_log_write_rate | 1.0 |
 | status_counts | {"needs_confirmation": 16, "executed": 16, "blocked": 8} |
+| multi_intent_cases | 0 |
+| multi_intent_pass_rate | 0 |
+| cross_domain_cases | 0 |
+| cross_domain_pass_rate | 0 |
 
 ## 3. Pass Rate By Case Type
 

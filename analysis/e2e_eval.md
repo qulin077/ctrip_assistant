@@ -2,6 +2,8 @@
 
 ## 1. Evaluation Setup
 
+- Eval split: `regression`
+- Eval set: `/Users/qulin/Desktop/AI/ai project/ctrip_assistant/kb/metadata/e2e_eval_regression.jsonl`
 - Eval cases: 30
 - Embedding provider: `sentence_transformers:BAAI/bge-m3`
 - Embedding model: `BAAI/bge-m3`
@@ -18,6 +20,10 @@
 | executed_accuracy | 1.0 |
 | handoff_accuracy | 1.0 |
 | status_counts | {"answer_only": 4, "handoff": 8, "needs_confirmation": 9, "executed": 8, "blocked": 1} |
+| multi_intent_cases | 0 |
+| multi_intent_accuracy | 0 |
+| cross_domain_cases | 0 |
+| cross_domain_accuracy | 0 |
 
 ## 3. Accuracy By Intent
 
